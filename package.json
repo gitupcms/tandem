@@ -3,9 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": "./sdk/src/index.ts",
   "license": "MIT",
   "scripts": {
-    "test": "bun test"
+    "test": "bun test",
+    "build:guard": "mkdir -p guard/build && cc -shared -fPIC -O2 -o guard/build/libtandemguard.$([ \"$(uname)\" = Darwin ] && echo dylib || echo so) guard/tandem_guard.c -ldl"
   },
   "devDependencies": {
     "@types/bun": "latest"

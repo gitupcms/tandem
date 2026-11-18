@@ -1,0 +1,7 @@
+{
+  "platforms": {
+    "swift": ["swift/.build/release/TandemProbe", "probe"],
+    "kotlin": ["kotlin/probe-host/build/install/probe-host/bin/probe-host", "probe"]
+  },
+  "guard": "guard/build/libtandemguard.so"
+}

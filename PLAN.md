@@ -41,8 +41,8 @@ Her faz bir PR'dır. Faz, doğrulama komutu yeşil olmadan bitmiş sayılmaz.
 | F1 | Kendi protokolümüz (`spec/protocol.md`: hello/ls/do, node ağacı, odak, lending, kapalı input şeması, kanonik çıktı) ve conformance vakaları, TS referans host ile doğrulanmış | Ben (spec), opus-yazici (vakalar + referans host) | **Bitti**: 86 vaka, TS referans host ile doğrulandı. |
 | F2 | Swift kit: strict decoder, `Node` (name/state/actions/child), odak ve lending, NDJSON stdio host. Linux ve macOS. | opus-yazici | **Bitti**: Linux'ta 86/86, diferansiyel fuzz'da TS ve Kotlin ile birebir aynı. |
 | F3 | Kotlin kit: aynı yüzey, JVM-only | OpenCode (`/opencode-devret`), takılırsa opus-yazici | **Bitti**: 86/86, Swift ile baytça aynı. |
-| F4 | Network guard: `LD_PRELOAD`/`DYLD_INSERT_LIBRARIES` C shim, canary ile | opus-yazici | Kırmızı yol testi: ağ denemesi exit≠0 |
-| F5 | Bun test SDK: host başlatma, `precondition`, `do`, poll ve son state'i basan hata, `--platform both` parity diff | OpenCode | `bun test` örnek journey'lerle, iki platformda yeşil |
+| F4 | Network guard: `LD_PRELOAD`/`DYLD_INSERT_LIBRARIES` C shim, canary ile | opus-yazici | **Bitti** (Linux): canary reddediliyor ve loglanıyor, iki host guard altında conformance geçiyor. macOS denenmedi. |
+| F5 | Bun test SDK: host başlatma, `precondition`, `do`, poll ve son state'i basan hata, `--platform both` parity diff | OpenCode | **Bitti**: `sdk/`, 5 probe journey × (swift, kotlin, parity), bozulan parity'yi yakalayan test. |
 | F6 | Örnek uygulama: inventory (liste → detay → artır/azalt, tab + push navigator, GraphQL fixture). Swift Core + Kotlin Core + paylaşılan journey'ler. | OpenCode (Kotlin), opus-yazici (Swift) | ~10 journey, iki platformda yeşil, ağ guard'ı açık |
 | F7 | Codegen: Swift `@Introspectable` / `@IntrospectionInput` macro, Kotlin KSP processor, elle yazılan node'ların yerine | opus-yazici | Örnek uygulamada elle yazılmış node kalmaz, testler aynen yeşil |
 | F8 | Debug socket host (uygulama içi canlı kullanım), release build'den çıkarıldığının kontrolü. SwiftUI ve Compose örnek host'ları. | opus-yazici | macOS CI'da release binary'de socket sembolü yok |
