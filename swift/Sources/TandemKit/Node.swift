@@ -24,3 +24,23 @@ public struct Action {
         self.perform = perform
     }
 }
+
+/// A node built from closures, read on every request, so it always reflects the current view model.
+public final class ScreenNode: Node {
+    public let name: String
+    private let getState: () -> JSON
+    private let getActions: () -> [Action]
+    private let getChild: () -> Node?
+
+    public init(name: String, state: @escaping () -> JSON = { .object([]) }, actions: @escaping () -> [Action] = { [] },
+                child: @escaping () -> Node? = { nil }) {
+        self.name = name
+        getState = state
+        getActions = actions
+        getChild = child
+    }
+
+    public var state: JSON { getState() }
+    public var actions: [Action] { getActions() }
+    public var child: Node? { getChild() }
+}

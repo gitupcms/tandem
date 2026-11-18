@@ -30,9 +30,9 @@ final class UpdateTests: XCTestCase {
 
     func testThresholdRange() {
         var s = Settings.State()
-        Settings.update(&s, .view(.setThreshold(-1)))
+        Settings.update(&s, .view(.setThreshold(value: -1)))
         XCTAssertEqual(s, Settings.State(lowStockThreshold: 3, message: "Threshold must be between 0 and 1000"))
-        Settings.update(&s, .view(.setThreshold(1000)))
+        Settings.update(&s, .view(.setThreshold(value: 1000)))
         XCTAssertEqual(s, Settings.State(lowStockThreshold: 1000, message: ""))
     }
 
@@ -49,8 +49,8 @@ final class UpdateTests: XCTestCase {
         app.send(ProductDetail.Action.decrement) // refused at zero: no service call
         XCTAssertEqual(service.adjustCalls, 0)
         app.send(ProductDetail.Action.increment)
-        app.send(App.Action.back)
-        app.send(App.Action.back) // stack root: no change
+        app.send(App.StackAction.back)
+        app.send(App.StackAction.back) // stack root: no change
         XCTAssertEqual(app.state.stack, [.list])
         XCTAssertEqual(ProductList.rows(app.state.list, threshold: 0).first?.lowStock, false)
         XCTAssertEqual(app.state.list.products.first?.quantity, 1)

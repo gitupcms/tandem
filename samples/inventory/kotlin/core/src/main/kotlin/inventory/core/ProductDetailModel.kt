@@ -1,10 +1,14 @@
 package inventory.core
 
+import tandem.Introspectable
+import tandem.IntrospectableActions
+
 /**
  * ProductDetail view model. Starts from the list's copy of [product]; every adjustment goes through
  * the service and its result arrives as a message.
  */
 class ProductDetailModel(product: Product, private val service: InventoryService) {
+    @Introspectable
     data class State(
         val id: String,
         val title: String,
@@ -14,6 +18,7 @@ class ProductDetailModel(product: Product, private val service: InventoryService
         val message: String,
     )
 
+    @IntrospectableActions
     sealed interface Action {
         data object Increment : Action
 

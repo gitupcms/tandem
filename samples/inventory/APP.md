@@ -4,7 +4,7 @@ A small store-inventory app, built twice: Swift (`swift/`) and Kotlin (`kotlin/`
 
 ## Layers
 
-- **Core** (Swift package library / Kotlin JVM module): view models, reducer (`update`), navigation state, domain types. No UI, no Tandem kit, no I/O. Services are constructor-injected interfaces.
+- **Core** (Swift package library / Kotlin JVM module): view models, reducer (`update`), navigation state, domain types. No UI, no host, no stdio, no I/O. Core may depend on the Tandem kit only for the introspection annotations and the code they generate (state JSON, action input schemas and decoding). Services are constructor-injected interfaces.
 - **CLI** (executable): depends on Core and TandemKit. Implements the services from fixture files, adapts view models to kit `Node`s, runs the stdio host.
 - Each view model: `State`, public `Action` enum dispatched with `send(action)`, internal `Message` (`.view(Action)` plus service results), `update(state, message)` as the only place state changes.
 

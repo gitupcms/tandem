@@ -1,6 +1,9 @@
 /// Root view model: tabs, the inventory stack, and the screens' states. Quantity changes in a detail are
 /// written back to the list here, so both screens show the same product.
+import TandemIntrospection
+
 public enum App {
+    @IntrospectableEnum
     public enum Tab: String { case inventory, settings }
 
     public enum Route: Equatable {
@@ -15,13 +18,20 @@ public enum App {
         public var settings = Settings.State()
     }
 
+    @IntrospectableActions
     public enum Action: Equatable {
-        case selectTab(Tab)
+        case selectTab(tab: Tab)
+    }
+
+    /// Actions of the inventory stack.
+    @IntrospectableActions
+    public enum StackAction: Equatable {
         case back
     }
 
     enum Message {
         case view(Action)
+        case stack(StackAction)
         case list(ProductList.Message)
         case detail(ProductDetail.Message)
         case settings(Settings.Message)
@@ -35,7 +45,7 @@ public enum App {
     static func update(_ s: inout State, _ m: Message) -> Effect? {
         switch m {
         case .view(.selectTab(let tab)): s.tab = tab
-        case .view(.back): if s.stack.count > 1 { s.stack.removeLast() }
+        case .stack(.back): if s.stack.count > 1 { s.stack.removeLast() }
         case .list(let m):
             switch ProductList.update(&s.list, m) {
             case .fetch?: return .fetch
@@ -64,6 +74,7 @@ public final class AppModel {
     }
 
     public func send(_ action: App.Action) { dispatch(.view(action)) }
+    public func send(_ action: App.StackAction) { dispatch(.stack(action)) }
     public func send(_ action: ProductList.Action) { dispatch(.list(.view(action))) }
     public func send(_ action: ProductDetail.Action) { dispatch(.detail(.view(action))) }
     public func send(_ action: Settings.Action) { dispatch(.settings(.view(action))) }

@@ -1,9 +1,14 @@
 package inventory.core
 
+import tandem.Introspectable
+import tandem.IntrospectableActions
+
 /** Settings view model. The threshold itself is shared by mirroring it onto the list through a message. */
 class SettingsModel {
+    @Introspectable
     data class State(val lowStockThreshold: Int, val message: String)
 
+    @IntrospectableActions
     sealed interface Action {
         data class SetThreshold(val value: Int) : Action
     }

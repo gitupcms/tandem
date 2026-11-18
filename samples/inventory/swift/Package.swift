@@ -8,7 +8,7 @@ let package = Package(
     // component, and "swift" would collide with this package's own directory name (cyclic dependency error).
     dependencies: [.package(path: "tandem-kit")],
     targets: [
-        .target(name: "InventoryCore"),
+        .target(name: "InventoryCore", dependencies: [.product(name: "TandemIntrospection", package: "tandem-kit")]),
         .executableTarget(name: "InventoryCLI", dependencies: ["InventoryCore", .product(name: "TandemKit", package: "tandem-kit")]),
         .testTarget(name: "InventoryCoreTests", dependencies: ["InventoryCore"]),
     ]

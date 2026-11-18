@@ -1,7 +1,11 @@
 // Screen view models: State, public Action, internal Message, and a pure `update` that may ask for a service
-// call (Effect). AppModel runs effects and feeds their results back as messages.
+// call (Effect). AppModel runs effects and feeds their results back as messages. `ViewState` is what a screen
+// shows; the macros generate its JSON and the actions' input schemas and decoding.
+
+import TandemIntrospection
 
 public enum ProductList {
+    @IntrospectableEnum
     public enum Status: String { case loaded, failed }
 
     public struct State: Equatable {
@@ -10,6 +14,7 @@ public enum ProductList {
         public var products: [Product] = []
     }
 
+    @Introspectable
     public struct Row: Equatable {
         public let id: String
         public let title: String
@@ -17,6 +22,7 @@ public enum ProductList {
         public let lowStock: Bool
     }
 
+    @IntrospectableActions
     public enum Action: Equatable {
         case open(id: String)
         case retry
@@ -45,6 +51,17 @@ public enum ProductList {
     public static func rows(_ s: State, threshold: Int) -> [Row] {
         s.products.map { Row(id: $0.id, title: $0.title, quantity: $0.quantity, lowStock: $0.quantity <= threshold) }
     }
+
+    @Introspectable
+    public struct ViewState {
+        public let status: Status
+        public let error: String
+        public let products: [Row]
+    }
+
+    public static func view(_ s: State, threshold: Int) -> ViewState {
+        ViewState(status: s.status, error: s.error, products: rows(s, threshold: threshold))
+    }
 }
 
 public enum ProductDetail {
@@ -53,6 +70,7 @@ public enum ProductDetail {
         public var message = ""
     }
 
+    @IntrospectableActions
     public enum Action: Equatable {
         case increment
         case decrement
@@ -65,6 +83,21 @@ public enum ProductDetail {
 
     enum Effect: Equatable {
         case adjust(id: String, delta: Int)
+    }
+
+    @Introspectable
+    public struct ViewState {
+        public let id: String
+        public let title: String
+        public let sku: String
+        public let price: String
+        public let quantity: Int
+        public let message: String
+    }
+
+    public static func view(_ s: State) -> ViewState {
+        let p = s.product
+        return ViewState(id: p.id, title: p.title, sku: p.sku, price: p.price, quantity: p.quantity, message: s.message)
     }
 
     static let belowZero = "Quantity cannot go below zero"
@@ -85,13 +118,15 @@ public enum ProductDetail {
 }
 
 public enum Settings {
+    @Introspectable
     public struct State: Equatable {
         public var lowStockThreshold = 3
         public var message = ""
     }
 
+    @IntrospectableActions
     public enum Action: Equatable {
-        case setThreshold(Int64)
+        case setThreshold(value: Int64)
     }
 
     enum Message {

@@ -1,5 +1,8 @@
 package inventory.core
 
+import tandem.Introspectable
+import tandem.IntrospectableActions
+
 /**
  * ProductList view model. Owns the fetched catalog and projects it into the list state.
  * [update] is the only place state changes.
@@ -9,10 +12,13 @@ class ProductListModel(
     threshold: Int,
 ) {
     /** One row of the list; [lowStock] is `quantity <= threshold` at projection time. */
+    @Introspectable
     data class Row(val id: String, val title: String, val quantity: Int, val lowStock: Boolean)
 
+    @Introspectable
     data class State(val status: String, val error: String, val products: List<Row>)
 
+    @IntrospectableActions
     sealed interface Action {
         data class Open(val id: String) : Action
 

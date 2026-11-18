@@ -1,19 +1,19 @@
 package inventory.core
 
+import tandem.IntrospectableActions
+import tandem.IntrospectableEnum
+
 /**
  * Root view model: owns the tab and the inventory stack, forwards screen actions, and mirrors shared
  * facts (quantity, threshold) onto the list through messages. [update] is the only place its state changes.
  */
 class AppModel(private val service: InventoryService) {
 
-    enum class Tab(val wire: String) {
-        Inventory("inventory"),
-        Settings("settings"),
-        ;
-
-        companion object {
-            fun fromWire(value: String): Tab? = entries.firstOrNull { it.wire == value }
-        }
+    /** Wire values are the constant names, so lowercase on purpose. */
+    @IntrospectableEnum
+    enum class Tab {
+        inventory,
+        settings,
     }
 
     /** One level of the inventory stack; the detail level keeps its own view model. */
@@ -26,6 +26,7 @@ class AppModel(private val service: InventoryService) {
     data class State(val tab: Tab, val stack: List<StackEntry>)
 
     /** Everything a screen can ask for, across the whole app. */
+    @IntrospectableActions
     sealed interface Action {
         data class Open(val id: String) : Action
 
@@ -37,7 +38,7 @@ class AppModel(private val service: InventoryService) {
 
         data object Back : Action
 
-        data class SelectTab(val tab: String) : Action
+        data class SelectTab(val tab: Tab) : Action
 
         data class SetThreshold(val value: Int) : Action
     }
@@ -50,7 +51,7 @@ class AppModel(private val service: InventoryService) {
 
     val list = ProductListModel(service, settings.state.lowStockThreshold)
 
-    var state: State = State(Tab.Inventory, listOf(StackEntry.List))
+    var state: State = State(Tab.inventory, listOf(StackEntry.List))
         private set
 
     fun send(action: Action) {
@@ -78,7 +79,7 @@ class AppModel(private val service: InventoryService) {
 
         Action.Back -> if (state.stack.size > 1) state.copy(stack = state.stack.dropLast(1)) else state
 
-        is Action.SelectTab -> Tab.fromWire(action.tab)?.let { state.copy(tab = it) } ?: state
+        is Action.SelectTab -> state.copy(tab = action.tab)
 
         is Action.SetThreshold -> {
             val before = settings.state.lowStockThreshold
