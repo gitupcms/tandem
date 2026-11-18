@@ -7,7 +7,7 @@ import { session } from "tandem-kit";
 const bun = process.execPath;
 const fake = join(import.meta.dir, "fake-host.ts");
 const tmp = mkdtempSync(join(tmpdir(), "tandem-sdk-"));
-const fakeLib = join(tmp, "libfake.so"); // only has to exist: the fake host writes the guard log itself
+const fakeLib = join(tmp, process.platform === "darwin" ? "libfake.dylib" : "libfake.so"); // only has to exist: the fake host writes the guard log itself
 writeFileSync(fakeLib, "");
 const host = (platform: string, ...args: string[]) => [bun, fake, platform, ...args];
 
