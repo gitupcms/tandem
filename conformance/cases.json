@@ -1,0 +1,1336 @@
+{
+  "version": 1,
+  "about": "Tandem protocol v1 conformance cases (spec/protocol.md is the source of truth). probe: the app every host builds for this suite. root -> child (a stack) -> screens (bottom to top; the last is focused). Each action names a fixed behavior described in probe.behaviors; input is the action's schema or null. Lent actions come from the stack, then the root. cases: each case runs in a fresh host session (fresh app). Input bytes = each 'send' string UTF-8 encoded followed by one LF, then the raw bytes of 'sendHex' (hex digits, optional) appended as-is. padLine {index, bytes}: before sending, append ASCII spaces (0x20) to send[index] until its UTF-8 length is exactly 'bytes' (LF not counted). Close the input after sending. The host's whole stdout must equal each 'expect' string UTF-8 encoded followed by one LF, nothing else. Before comparing: replace {{platform}} in expected lines with the host's platform (swift or kotlin), and in every actual line apply the regex ^\\{\"error\":\\{\"code\":\"([a-z]+)\",\"message\":\"(?:[^\"\\\\]|\\\\.)*\" -> {\"error\":{\"code\":\"$1\",\"message\":\"\". Expected error lines carry \"message\":\"\", so only error.message is ignored; it must still be present and a string. rule: the spec rule the case checks (for humans).",
+  "probe": {
+    "behaviors": {
+      "increment": "state.count += 1",
+      "add": "state.count += input.amount",
+      "rename": "state.label = input.label, or \"\" when omitted",
+      "set_mode": "state.mode = input.mode",
+      "set_tags": "state.tags = input.tags",
+      "configure": "state.meta = {tag: input.meta.tag, level: input.meta.level or 0, pinned: input.meta.pinned or false}",
+      "zero": "state.count = 0 (other state unchanged)",
+      "pop": "pop the stack's top screen; with one screen left, do nothing (ok:true, unchanged)",
+      "reset": "rebuild the whole app in its initial state (stack = [Home, Probe] with initial states)"
+    },
+    "root": {
+      "name": "App",
+      "kind": "root",
+      "actions": [
+        {
+          "name": "Reset",
+          "input": null,
+          "behavior": "reset"
+        }
+      ],
+      "child": {
+        "name": "Stack",
+        "kind": "stack",
+        "actions": [
+          {
+            "name": "Back",
+            "input": null,
+            "behavior": "pop"
+          }
+        ],
+        "screens": [
+          {
+            "name": "Home",
+            "state": {
+              "a": 1,
+              "B": 2,
+              "é": 3,
+              "｡": 4,
+              "😀": 5
+            },
+            "actions": []
+          },
+          {
+            "name": "Probe",
+            "state": {
+              "count": 0,
+              "label": "",
+              "meta": {
+                "level": 0,
+                "pinned": false,
+                "tag": ""
+              },
+              "mode": "off",
+              "tags": []
+            },
+            "actions": [
+              {
+                "name": "Increment",
+                "input": null,
+                "behavior": "increment"
+              },
+              {
+                "name": "Add",
+                "input": {
+                  "type": "object",
+                  "properties": {
+                    "amount": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "amount"
+                  ]
+                },
+                "behavior": "add"
+              },
+              {
+                "name": "Rename",
+                "input": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "behavior": "rename"
+              },
+              {
+                "name": "SetMode",
+                "input": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "on",
+                        "café"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "mode"
+                  ]
+                },
+                "behavior": "set_mode"
+              },
+              {
+                "name": "Tag",
+                "input": {
+                  "type": "object",
+                  "properties": {
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "tags"
+                  ]
+                },
+                "behavior": "set_tags"
+              },
+              {
+                "name": "Configure",
+                "input": {
+                  "type": "object",
+                  "properties": {
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "tag": {
+                          "type": "string"
+                        },
+                        "level": {
+                          "type": "integer"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "tag"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "meta"
+                  ]
+                },
+                "behavior": "configure"
+              },
+              {
+                "name": "Reset",
+                "input": null,
+                "behavior": "zero"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "framing.empty-input",
+      "rule": "No bytes, no lines, no responses.",
+      "expect": []
+    },
+    {
+      "id": "framing.crlf",
+      "rule": "A CR before the LF is ignored.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}\r",
+        "{\"op\":\"ls\"}\r"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.cr-only-line",
+      "rule": "CR+LF alone is an empty line: json error.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "\r",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.empty-line",
+      "rule": "An empty line is a json error; the session continues.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.blank-line",
+      "rule": "A blank (whitespace-only) line is a json error.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        " \t ",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.bom",
+      "rule": "A line starting with a byte order mark is a json error.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}"
+      ],
+      "sendHex": "efbbbf7b226f70223a226c73227d0a7b226f70223a226c73227d0a",
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.bom-before-hello",
+      "rule": "json is checked before handshake; a failed line does not count as hello.",
+      "sendHex": "efbbbf7b226f70223a2268656c6c6f222c2276657273696f6e223a317d0a7b226f70223a2268656c6c6f222c2276657273696f6e223a317d0a7b226f70223a226c73227d0a",
+      "expect": [
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.invalid-utf8",
+      "rule": "A line with invalid UTF-8 (0xFF) is a json error.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}"
+      ],
+      "sendHex": "7b226f70223a22646f222c22616374696f6e223a2252656e616d65222c22696e707574223a7b226c6162656c223a22ff227d7d0a7b226f70223a226c73227d0a",
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.invalid-utf8-forms",
+      "rule": "Overlong (C0 AF), encoded surrogate (ED A0 80) and truncated (E2 82) UTF-8 are json errors.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}"
+      ],
+      "sendHex": "7b226f70223a226c73222c2278223a22c0af227d0a7b226f70223a226c73222c2278223a22eda080227d0a7b226f70223a226c73222c2278223a22e282227d0a7b226f70223a226c73227d0a",
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.no-final-lf",
+      "rule": "Bytes after the last LF count as one more line.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}"
+      ],
+      "sendHex": "7b226f70223a226c73227d",
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.no-final-lf-error",
+      "rule": "A trailing partial line without LF is still answered.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}"
+      ],
+      "sendHex": "7b226f70223a",
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "framing.final-lf-no-extra-line",
+      "rule": "One response per line, in order; input ending in LF has no extra empty line after it.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.session-continues",
+      "rule": "After an error the session continues with the next line.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "nope",
+        "{\"op\":\"ls\"}",
+        "{",
+        "{\"op\":\"do\",\"action\":\"Increment\"}",
+        "}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":1,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":1,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.line-1mib",
+      "rule": "A line of exactly 1 MiB (1048576 bytes, LF excluded) is accepted; trailing JSON whitespace is padding.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\"}"
+      ],
+      "padLine": {
+        "index": 1,
+        "bytes": 1048576
+      },
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.line-too-long",
+      "rule": "A line longer than 1 MiB is a json error.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\"}",
+        "{\"op\":\"ls\"}"
+      ],
+      "padLine": {
+        "index": 1,
+        "bytes": 1048577
+      },
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.depth-64",
+      "rule": "Nesting of exactly 64 levels is allowed (then the non-object is a request error).",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "framing.depth-65",
+      "rule": "Nesting deeper than 64 levels is a json error.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "framing.depth-65-in-object",
+      "rule": "Depth counts the outer object: object + 64 arrays = 65 levels, json error.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\",\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "framing.depth-64-in-object",
+      "rule": "Object + 63 arrays = 64 levels: parsed, then rejected as an unknown field.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\",\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.x\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "framing.duplicate-key",
+      "rule": "A duplicate key is a json error.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\",\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "framing.duplicate-key-nested",
+      "rule": "A duplicate key at any level is a json error, before any input check.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":1,\"amount\":2}}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "framing.duplicate-key-in-array",
+      "rule": "Duplicate keys inside an object inside an array are a json error.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Tag\",\"input\":{\"tags\":[{\"a\":1,\"a\":2}]}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "framing.duplicate-key-escaped",
+      "rule": "Keys are compared after unescaping: \"o\\u0070\" duplicates \"op\".",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\",\"o\\u0070\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "framing.invalid-json",
+      "rule": "Malformed JSON is a json error.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{op:ls}",
+        "{\"op\":\"ls\"} x",
+        "{\"op\":\"ls\",}",
+        "01",
+        "'ls'"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "framing.raw-control-in-string",
+      "rule": "A raw control character inside a JSON string is invalid JSON.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\t\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "framing.whitespace-between-tokens",
+      "rule": "JSON whitespace between tokens is allowed.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        " { \"op\" : \"ls\" } "
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "handshake.ls-before-hello",
+      "rule": "Anything other than hello before a successful hello is a handshake error (no path).",
+      "send": [
+        "{\"op\":\"ls\"}",
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"error\":{\"code\":\"handshake\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "handshake.do-before-hello",
+      "rule": "do before hello is a handshake error and changes nothing.",
+      "send": [
+        "{\"op\":\"do\",\"action\":\"Increment\"}",
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"error\":{\"code\":\"handshake\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "version.unsupported",
+      "rule": "hello with an unsupported version is a version error with supported:[1]; it may be retried.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":2}",
+        "{\"op\":\"ls\"}",
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"error\":{\"code\":\"version\",\"message\":\"\",\"path\":\"$.version\"},\"ok\":false,\"supported\":[1]}",
+        "{\"error\":{\"code\":\"handshake\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "version.zero-and-negative",
+      "rule": "Versions 0 and -1 are version errors.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":0}",
+        "{\"op\":\"hello\",\"version\":-1}",
+        "{\"op\":\"hello\",\"version\":1}"
+      ],
+      "expect": [
+        "{\"error\":{\"code\":\"version\",\"message\":\"\",\"path\":\"$.version\"},\"ok\":false,\"supported\":[1]}",
+        "{\"error\":{\"code\":\"version\",\"message\":\"\",\"path\":\"$.version\"},\"ok\":false,\"supported\":[1]}",
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}"
+      ]
+    },
+    {
+      "id": "hello.version-mistyped",
+      "rule": "hello.version must be an integer: \"1\", 1.0, 1e0, null and a missing version are request errors.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":\"1\"}",
+        "{\"op\":\"hello\",\"version\":1.0}",
+        "{\"op\":\"hello\",\"version\":1e0}",
+        "{\"op\":\"hello\",\"version\":null}",
+        "{\"op\":\"hello\"}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.version\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.version\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.version\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.version\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.version\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"handshake\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "hello.unknown-field",
+      "rule": "Unknown fields are rejected on hello; the failed hello does not complete the handshake.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1,\"client\":\"x\"}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.client\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"handshake\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "request.not-object",
+      "rule": "A request that is not an object is a request error without path.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "[]",
+        "\"ls\"",
+        "1",
+        "null",
+        "true",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "request.op-missing",
+      "rule": "A missing op is a request error at $.op.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{}",
+        "{\"action\":\"Back\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.op\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.op\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "request.op-not-string",
+      "rule": "A non-string op is a request error at $.op.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":1}",
+        "{\"op\":null}",
+        "{\"op\":[\"ls\"]}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.op\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.op\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.op\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "request.op-unknown",
+      "rule": "An unknown op is a request error at $.op; op is case-sensitive.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"LS\"}",
+        "{\"op\":\"list\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.op\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.op\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "request.unknown-field-ls",
+      "rule": "ls takes no fields.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\",\"action\":\"Back\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "request.unknown-field-do",
+      "rule": "do rejects unknown fields and changes nothing.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":1},\"extra\":0}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.extra\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "request.action-missing",
+      "rule": "do without action is a request error at $.action.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\"}",
+        "{\"op\":\"do\",\"input\":{}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "request.action-mistyped",
+      "rule": "do.action must be a string.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":[\"Back\"]}",
+        "{\"op\":\"do\",\"action\":null}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "request.input-mistyped",
+      "rule": "do.input must be an object when present; null, arrays and strings are request errors.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":[1]}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":\"x\"}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":null}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.input\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.input\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.input\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "precedence.json-over-request",
+      "rule": "json beats request.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":1,\"op\":1}",
+        "[1,2"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"json\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "precedence.request-over-handshake",
+      "rule": "request beats handshake.",
+      "send": [
+        "{\"op\":\"ls\",\"x\":1}",
+        "{\"op\":\"nope\"}",
+        "[]",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.x\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.op\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"handshake\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "precedence.handshake-over-action-input",
+      "rule": "handshake beats action and input.",
+      "send": [
+        "{\"op\":\"do\",\"action\":\"Nope\"}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":\"1\"}}",
+        "{\"op\":\"do\",\"action\":\"Increment\",\"input\":{}}"
+      ],
+      "expect": [
+        "{\"error\":{\"code\":\"handshake\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"handshake\",\"message\":\"\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"handshake\",\"message\":\"\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "precedence.request-over-version",
+      "rule": "request beats version.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":2,\"x\":1}"
+      ],
+      "expect": [
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.x\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "precedence.request-over-action",
+      "rule": "A mistyped input field is a request error even when the action is unknown.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Nope\",\"input\":1}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.input\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "precedence.action-over-input",
+      "rule": "action beats input.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Nope\",\"input\":{\"amount\":\"x\"}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"action\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "action.unknown",
+      "rule": "do with an action the focused screen does not offer is an action error at $.action.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Nope\"}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"action\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "action.case-sensitive",
+      "rule": "Action names are exact.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"increment\"}",
+        "{\"op\":\"do\",\"action\":\"back\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"action\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"action\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "action.not-on-focused-screen",
+      "rule": "After Back, the previous screen's actions are gone.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Back\"}",
+        "{\"op\":\"do\",\"action\":\"Increment\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"},{\"from\":\"App\",\"input\":null,\"name\":\"Reset\"}],\"name\":\"Home\",\"path\":[\"App\",\"Stack\",\"Home\"],\"state\":{\"B\":2,\"a\":1,\"é\":3,\"😀\":5,\"｡\":4}}}",
+        "{\"error\":{\"code\":\"action\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "lending.list-order",
+      "rule": "Own actions first, then lent ones nearest container first; the shadowed App.Reset is not listed.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "lending.back-pops",
+      "rule": "Back (lent by Stack) pops to Home: name, path and from change; App lends Reset after Stack's Back.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Back\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"},{\"from\":\"App\",\"input\":null,\"name\":\"Reset\"}],\"name\":\"Home\",\"path\":[\"App\",\"Stack\",\"Home\"],\"state\":{\"B\":2,\"a\":1,\"é\":3,\"😀\":5,\"｡\":4}}}"
+      ]
+    },
+    {
+      "id": "lending.back-at-bottom",
+      "rule": "Back with one screen left is an app rule, not an error: ok and unchanged.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Back\"}",
+        "{\"op\":\"do\",\"action\":\"Back\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"},{\"from\":\"App\",\"input\":null,\"name\":\"Reset\"}],\"name\":\"Home\",\"path\":[\"App\",\"Stack\",\"Home\"],\"state\":{\"B\":2,\"a\":1,\"é\":3,\"😀\":5,\"｡\":4}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"},{\"from\":\"App\",\"input\":null,\"name\":\"Reset\"}],\"name\":\"Home\",\"path\":[\"App\",\"Stack\",\"Home\"],\"state\":{\"B\":2,\"a\":1,\"é\":3,\"😀\":5,\"｡\":4}}}"
+      ]
+    },
+    {
+      "id": "lending.nearest-wins",
+      "rule": "Probe and App both offer Reset; Probe's (nearest) wins and only zeroes count.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":5}}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{\"label\":\"x\"}}",
+        "{\"op\":\"do\",\"action\":\"Reset\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":5,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":5,\"label\":\"x\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"x\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "lending.root-action",
+      "rule": "On Home, App's Reset is reachable and rebuilds the app.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":3}}",
+        "{\"op\":\"do\",\"action\":\"Back\"}",
+        "{\"op\":\"do\",\"action\":\"Reset\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":3,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"},{\"from\":\"App\",\"input\":null,\"name\":\"Reset\"}],\"name\":\"Home\",\"path\":[\"App\",\"Stack\",\"Home\"],\"state\":{\"B\":2,\"a\":1,\"é\":3,\"😀\":5,\"｡\":4}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.no-input",
+      "rule": "An action without schema takes no input.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Increment\"}",
+        "{\"op\":\"do\",\"action\":\"Increment\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":1,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":2,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.given-to-schemaless",
+      "rule": "input given to an action without schema is an input error at $.input, even {}.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Increment\",\"input\":{}}",
+        "{\"op\":\"do\",\"action\":\"Reset\",\"input\":{\"x\":1}}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.required-integer",
+      "rule": "A required integer.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":5}}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":-2}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":5,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":3,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.required-missing",
+      "rule": "A missing required field is an input error at its path; omitted input counts as {}.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{}}",
+        "{\"op\":\"do\",\"action\":\"Add\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.integer-max",
+      "rule": "9007199254740991 is a valid integer.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":9007199254740991}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":9007199254740991,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.integer-above-max",
+      "rule": "9007199254740992 is out of range.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":9007199254740992}}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":100000000000000000000}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.integer-min",
+      "rule": "-9007199254740991 is a valid integer.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":-9007199254740991}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":-9007199254740991,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.integer-below-min",
+      "rule": "-9007199254740992 is out of range.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":-9007199254740992}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.integer-lexical",
+      "rule": "1.0, 1e2, 1E2, 0.5 and \"1\" are not integers.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":1.0}}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":1e2}}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":1E2}}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":0.5}}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":\"1\"}}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.integer-other-types",
+      "rule": "true, [1] and {} are not integers.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":true}}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":[1]}}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":{}}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.integer-plain-output",
+      "rule": "Integers are written in plain decimal.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":100}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":100,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.null-rejected",
+      "rule": "null is never valid, even for an optional field.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{\"label\":null}}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":null}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.label\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.unknown-property",
+      "rule": "Object schemas are closed.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":1,\"extra\":1}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.extra\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.key-exact",
+      "rule": "Keys compare by exact code units; escapes decode first.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{\"Label\":\"x\"}}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{\"lab\\u0065l\":\"y\"}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.Label\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"y\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.optional-omitted",
+      "rule": "An optional field may be left out; input itself may be omitted.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{\"label\":\"x\"}}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{}}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{\"label\":\"y\"}}",
+        "{\"op\":\"do\",\"action\":\"Rename\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"x\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"y\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.string-mistyped",
+      "rule": "A string field rejects other types.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{\"label\":5}}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{\"label\":[\"x\"]}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.label\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.label\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.enum",
+      "rule": "enum allows only the listed strings.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"SetMode\",\"input\":{\"mode\":\"on\"}}",
+        "{\"op\":\"do\",\"action\":\"SetMode\",\"input\":{\"mode\":\"ON\"}}",
+        "{\"op\":\"do\",\"action\":\"SetMode\",\"input\":{\"mode\":1}}",
+        "{\"op\":\"do\",\"action\":\"SetMode\",\"input\":{}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"on\",\"tags\":[]}}}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.mode\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.mode\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.mode\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.enum-no-normalization",
+      "rule": "Strings compare by exact code units: decomposed \"cafe\\u0301\" is not \"caf\\u00e9\".",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"SetMode\",\"input\":{\"mode\":\"cafe\\u0301\"}}",
+        "{\"op\":\"do\",\"action\":\"SetMode\",\"input\":{\"mode\":\"caf\\u00e9\"}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.mode\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"café\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.array",
+      "rule": "An array of strings, including empty.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Tag\",\"input\":{\"tags\":[\"b\",\"a\"]}}",
+        "{\"op\":\"do\",\"action\":\"Tag\",\"input\":{\"tags\":[]}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[\"b\",\"a\"]}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.array-item",
+      "rule": "A wrong element is reported at its index.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Tag\",\"input\":{\"tags\":[\"a\",1]}}",
+        "{\"op\":\"do\",\"action\":\"Tag\",\"input\":{\"tags\":[null]}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.tags[1]\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.tags[0]\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.array-mistyped",
+      "rule": "A non-array is rejected at the array's path.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Tag\",\"input\":{\"tags\":\"a\"}}",
+        "{\"op\":\"do\",\"action\":\"Tag\",\"input\":{\"tags\":{}}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.tags\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.tags\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.nested",
+      "rule": "A nested closed object; optional nested fields may be left out. Nested keys are sorted on output.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":{\"tag\":\"x\"}}}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":{\"pinned\":true,\"tag\":\"y\",\"level\":3}}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"x\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\",\"meta\":{\"level\":3,\"pinned\":true,\"tag\":\"y\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "input.nested-errors",
+      "rule": "Nested errors carry nested paths.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":{\"tag\":1}}}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":{\"tag\":\"x\",\"color\":\"red\"}}}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":{}}}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":null}}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":{\"tag\":\"x\",\"pinned\":\"true\"}}}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":{\"tag\":\"x\",\"level\":1.5}}}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.meta.tag\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.meta.color\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.meta.tag\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.meta\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.meta.pinned\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.meta.level\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.meta\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "input.failed-leaves-state",
+      "rule": "A failed request changes nothing.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":5}}",
+        "{\"op\":\"do\",\"action\":\"Tag\",\"input\":{\"tags\":[\"a\",1]}}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":{\"tag\":\"x\",\"level\":\"2\"}}}",
+        "{\"op\":\"do\",\"action\":\"Add\",\"input\":{\"amount\":1.0}}",
+        "{\"op\":\"do\",\"action\":\"Nope\"}",
+        "{\"op\":\"ls\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":5,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.tags[1]\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.meta.level\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.amount\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"action\",\"message\":\"\",\"path\":\"$.action\"},\"ok\":false}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":5,\"label\":\"\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "canonical.key-order-utf16",
+      "rule": "Keys sort by UTF-16 code units: U+1F600 (D83D DE00) sorts before U+FF61; uppercase before lowercase.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Back\"}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"},{\"from\":\"App\",\"input\":null,\"name\":\"Reset\"}],\"name\":\"Home\",\"path\":[\"App\",\"Stack\",\"Home\"],\"state\":{\"B\":2,\"a\":1,\"é\":3,\"😀\":5,\"｡\":4}}}"
+      ]
+    },
+    {
+      "id": "canonical.escapes",
+      "rule": "Only \", \\ and controls are escaped; \\b \\f \\n \\r \\t, else lowercase \\u00XX; / and DEL are raw.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{\"label\":\"\\u0000\\u0001\\u001F\\b\\f\\n\\r\\t\\\"\\\\\\/\\u007f\\u00e9\\ud83d\\ude00\"}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"\\u0000\\u0001\\u001f\\b\\f\\n\\r\\t\\\"\\\\/é😀\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    },
+    {
+      "id": "canonical.non-ascii-raw",
+      "rule": "Non-ASCII is written as raw UTF-8, whether it arrived raw or escaped.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Rename\",\"input\":{\"label\":\"ünïcödé 😀 中\"}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"ünïcödé 😀 中\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
+      ]
+    }
+  ]
+}

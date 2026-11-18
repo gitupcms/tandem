@@ -1,0 +1,7 @@
+# local agent skills are third-party copies, not part of this repo
+.claude/
+node_modules/
+.build/
+build/
+.gradle/
+*.log
