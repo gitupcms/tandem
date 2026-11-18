@@ -1331,6 +1331,58 @@
         "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
         "{\"ok\":true,\"screen\":{\"actions\":[{\"from\":\"Probe\",\"input\":null,\"name\":\"Increment\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"amount\":{\"type\":\"integer\"}},\"required\":[\"amount\"],\"type\":\"object\"},\"name\":\"Add\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"label\":{\"type\":\"string\"}},\"type\":\"object\"},\"name\":\"Rename\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"mode\":{\"enum\":[\"off\",\"on\",\"café\"],\"type\":\"string\"}},\"required\":[\"mode\"],\"type\":\"object\"},\"name\":\"SetMode\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"tags\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"name\":\"Tag\"},{\"from\":\"Probe\",\"input\":{\"properties\":{\"meta\":{\"properties\":{\"level\":{\"type\":\"integer\"},\"pinned\":{\"type\":\"boolean\"},\"tag\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"type\":\"object\"}},\"required\":[\"meta\"],\"type\":\"object\"},\"name\":\"Configure\"},{\"from\":\"Probe\",\"input\":null,\"name\":\"Reset\"},{\"from\":\"Stack\",\"input\":null,\"name\":\"Back\"}],\"name\":\"Probe\",\"path\":[\"App\",\"Stack\",\"Probe\"],\"state\":{\"count\":0,\"label\":\"ünïcödé 😀 中\",\"meta\":{\"level\":0,\"pinned\":false,\"tag\":\"\"},\"mode\":\"off\",\"tags\":[]}}}"
       ]
+    },
+    {
+      "id": "order.request-document-order",
+      "rule": "Several wrong request fields: the first in the request's own order wins.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"input\":1,\"x\":1}",
+        "{\"op\":\"do\",\"x\":1,\"input\":1}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.input\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.x\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "order.request-wrong-before-missing",
+      "rule": "A wrong field beats a missing required one.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"input\":null}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"request\",\"message\":\"\",\"path\":\"$.input\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "order.input-document-order",
+      "rule": "Inside input, the first wrong property in the request's own order wins.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":{\"tag\":1},\"x\":1}}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"x\":1,\"meta\":{\"tag\":1}}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.meta.tag\"},\"ok\":false}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.x\"},\"ok\":false}"
+      ]
+    },
+    {
+      "id": "order.input-wrong-before-missing",
+      "rule": "A wrong property beats a missing required one, at every level.",
+      "send": [
+        "{\"op\":\"hello\",\"version\":1}",
+        "{\"op\":\"do\",\"action\":\"Configure\",\"input\":{\"meta\":{\"level\":\"a\"}}}"
+      ],
+      "expect": [
+        "{\"ok\":true,\"platform\":\"{{platform}}\",\"version\":1}",
+        "{\"error\":{\"code\":\"input\",\"message\":\"\",\"path\":\"$.input.meta.level\"},\"ok\":false}"
+      ]
     }
   ]
 }

@@ -5,7 +5,15 @@ type Case = { id: string; rule: string; send?: string[]; sendHex?: string; padLi
 const suite: { version: number; about: string; probe: Probe; cases: Case[] } = await Bun.file(`${import.meta.dir}/../conformance/cases.json`).json();
 
 const enc = new TextEncoder();
-const PLATFORM = "swift";
+// TANDEM_HOST="<probe host command>" TANDEM_PLATFORM=swift|kotlin runs the suite against a real host process.
+const HOST_CMD = process.env.TANDEM_HOST?.split(" ").filter(Boolean);
+const PLATFORM = process.env.TANDEM_PLATFORM ?? "swift";
+const run = (bytes: Uint8Array): string => {
+  if (!HOST_CMD) return new Host(suite.probe, PLATFORM).run(bytes);
+  const p = Bun.spawnSync(HOST_CMD, { stdin: bytes, stdout: "pipe", stderr: "inherit" });
+  if (p.exitCode !== 0) throw new Error(`host exited ${p.exitCode}`);
+  return p.stdout.toString();
+};
 const ignoreMessage = (line: string) => line.replace(/^\{"error":\{"code":"([a-z]+)","message":"(?:[^"\\]|\\.)*"/, '{"error":{"code":"$1","message":""');
 
 function input(c: Case): Uint8Array {
@@ -37,7 +45,7 @@ test("cases.json structure", () => {
 describe("conformance", () => {
   for (const c of suite.cases) {
     test(c.id, () => {
-      const out = new Host(suite.probe, PLATFORM).run(input(c));
+      const out = run(input(c));
       const actual = out.split("\n");
       expect(actual.pop()).toBe(""); // every response ends with LF
       expect(actual.map(ignoreMessage)).toEqual(c.expect.map(l => l.replaceAll("{{platform}}", PLATFORM)));

@@ -103,12 +103,14 @@ function check(s: Schema, v: V, path: string): unknown {
       if (!(v instanceof Map)) fail("expected object");
       const props = s.properties ?? {};
       const m = v as Map<string, V>;
-      for (const k of m.keys()) if (!Object.hasOwn(props, k)) throw new Fail("input", "unknown property", `${path}.${k}`);
+      // Spec: first wrong field in the request's own order, then missing required fields in sorted order.
       const out: Record<string, unknown> = {};
-      for (const k of Object.keys(props).sort()) {
-        if (m.has(k)) out[k] = check(props[k], m.get(k)!, `${path}.${k}`);
-        else if (s.required?.includes(k)) throw new Fail("input", "missing required property", `${path}.${k}`);
+      for (const [k, x] of m) {
+        if (!Object.hasOwn(props, k)) throw new Fail("input", "unknown property", `${path}.${k}`);
+        out[k] = check(props[k], x, `${path}.${k}`);
       }
+      for (const k of [...(s.required ?? [])].sort())
+        if (!m.has(k)) throw new Fail("input", "missing required property", `${path}.${k}`);
       return out;
     }
     case "array":
@@ -190,12 +192,19 @@ export class Host {
     if (typeof op !== "string") throw new Fail("request", "op must be a string", "$.op");
     const fields: Record<string, string[]> = { hello: ["version"], ls: [], do: ["action", "input"] };
     if (!Object.hasOwn(fields, op)) throw new Fail("request", "unknown op", "$.op");
-    for (const k of req.keys()) if (k !== "op" && !fields[op].includes(k)) throw new Fail("request", "unknown field", `$.${k}`);
+    // op first (it decides the valid fields), then fields in the request's own order, then missing ones sorted.
+    const typed: Record<string, (v: V) => boolean> = {
+      version: v => intOf(v) !== undefined, action: v => typeof v === "string", input: v => v instanceof Map,
+    };
+    for (const [k, v] of req) {
+      if (k === "op") continue;
+      if (!fields[op].includes(k)) throw new Fail("request", "unknown field", `$.${k}`);
+      if (!typed[k](v)) throw new Fail("request", `${k} has the wrong type`, `$.${k}`);
+    }
+    const required: Record<string, string[]> = { hello: ["version"], ls: [], do: ["action"] };
+    for (const k of required[op]) if (!req.has(k)) throw new Fail("request", `${k} is missing`, `$.${k}`);
     const version = intOf(req.get("version"));
-    if (op === "hello" && version === undefined) throw new Fail("request", "version must be an integer", "$.version");
     const action = req.get("action"), input = req.get("input");
-    if (op === "do" && typeof action !== "string") throw new Fail("request", "action must be a string", "$.action");
-    if (op === "do" && req.has("input") && !(input instanceof Map)) throw new Fail("request", "input must be an object", "$.input");
 
     if (op !== "hello" && !this.greeted) throw new Fail("handshake", "send hello first");
     if (op === "hello") {

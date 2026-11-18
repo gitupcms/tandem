@@ -65,7 +65,7 @@ Failure:
 
 - A failed request changes nothing.
 - `path` points into the request, starting at `$`, with keys written as `.key` and array items as `[i]`. A missing or mistyped request field points at that field (`$.op`, `$.version`, `$.action`). An `action` error points at `$.action`. `path` is omitted when the error is about the whole line or the session (`json` on unreadable input, `handshake`).
-- When several fields are wrong, the error names the first one in the request's own order. Missing required fields come after that, in sorted key order.
+- `op` is checked first, since it decides which fields are valid. After that, when several fields are wrong, the error names the first one in the request's own order. Missing required fields come after that, in sorted key order. The same rule applies inside each input object.
 - `message` is for humans and is not compared between platforms. Everything else is.
 - A rule the app rejects (decrement below zero, a declined payment) is not a protocol error. The app answers `ok:true` and shows the outcome in `state`.
 

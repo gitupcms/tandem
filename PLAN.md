@@ -38,9 +38,9 @@ Her faz bir PR'dır. Faz, doğrulama komutu yeşil olmadan bitmiş sayılmaz.
 | Faz | İş | Kim | Çıktı / doğrulama |
 | --- | --- | --- | --- |
 | F0 | Repo iskeleti, LICENSE, CI, CONTRIBUTING | Ben | **Bitti**, CI yeşil. |
-| F1 | Kendi protokolümüz (`spec/protocol.md`: hello/ls/do, node ağacı, odak, lending, kapalı input şeması, kanonik çıktı) ve conformance vakaları, TS referans host ile doğrulanmış | Ben (spec), opus-yazici (vakalar + referans host) | `spec/protocol.md`, `conformance/cases.json`, `bun test` yeşil |
-| F2 | Swift kit: strict decoder, `Node` (name/state/actions/child), odak ve lending, NDJSON stdio host. Linux ve macOS. | opus-yazici | Linux'ta `swift test` + conformance %100 |
-| F3 | Kotlin kit: aynı yüzey, JVM-only | OpenCode (`/opencode-devret`), takılırsa opus-yazici | `./gradlew test` + conformance %100, Swift ile baytça aynı çıktı |
+| F1 | Kendi protokolümüz (`spec/protocol.md`: hello/ls/do, node ağacı, odak, lending, kapalı input şeması, kanonik çıktı) ve conformance vakaları, TS referans host ile doğrulanmış | Ben (spec), opus-yazici (vakalar + referans host) | **Bitti**: 86 vaka, TS referans host ile doğrulandı. |
+| F2 | Swift kit: strict decoder, `Node` (name/state/actions/child), odak ve lending, NDJSON stdio host. Linux ve macOS. | opus-yazici | **Bitti**: Linux'ta 86/86, diferansiyel fuzz'da TS ve Kotlin ile birebir aynı. |
+| F3 | Kotlin kit: aynı yüzey, JVM-only | OpenCode (`/opencode-devret`), takılırsa opus-yazici | **Bitti**: 86/86, Swift ile baytça aynı. |
 | F4 | Network guard: `LD_PRELOAD`/`DYLD_INSERT_LIBRARIES` C shim, canary ile | opus-yazici | Kırmızı yol testi: ağ denemesi exit≠0 |
 | F5 | Bun test SDK: host başlatma, `precondition`, `do`, poll ve son state'i basan hata, `--platform both` parity diff | OpenCode | `bun test` örnek journey'lerle, iki platformda yeşil |
 | F6 | Örnek uygulama: inventory (liste → detay → artır/azalt, tab + push navigator, GraphQL fixture). Swift Core + Kotlin Core + paylaşılan journey'ler. | OpenCode (Kotlin), opus-yazici (Swift) | ~10 journey, iki platformda yeşil, ağ guard'ı açık |
