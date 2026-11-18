@@ -13,7 +13,7 @@ const host = (platform: string, ...args: string[]) => [bun, fake, platform, ...a
 
 function runParity(stepB: number) {
   const cfg = join(tmp, `config-${stepB}.json`);
-  writeFileSync(cfg, JSON.stringify({ platforms: { a: host("a"), b: host("b", String(stepB)) } }));
+  writeFileSync(cfg, JSON.stringify({ apps: { fake: { a: host("a"), b: host("b", String(stepB)) } } }));
   const p = Bun.spawnSync([bun, "test", join(import.meta.dir, "fixtures/parity.journey.ts")], {
     env: { ...process.env, TANDEM_CONFIG: cfg, TANDEM_PLATFORM: "" },
     stdout: "pipe",

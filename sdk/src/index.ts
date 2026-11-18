@@ -160,7 +160,7 @@ export function parityDiff(transcripts: Record<string, Step[]>): string | undefi
   }
 }
 
-type Config = { platforms: Record<string, string[]>; guard?: string };
+type Config = { apps: Record<string, Record<string, string[]>>; guard?: string };
 let config: Config | undefined;
 
 function loadConfig(): Config {
@@ -170,29 +170,40 @@ function loadConfig(): Config {
   const raw: Config = JSON.parse(readFileSync(file, "utf8"));
   const local = (p: string) => (p.includes("/") && !isAbsolute(p) ? join(dir, p) : p);
   const only = process.env.TANDEM_PLATFORM;
-  const platforms = Object.fromEntries(
-    Object.entries(raw.platforms)
-      .filter(([name]) => !only || name === only)
-      .map(([name, [cmd, ...args]]) => [name, [local(cmd), ...args]]),
+  const apps = Object.fromEntries(
+    Object.entries(raw.apps).map(([app, platforms]) => {
+      const kept = Object.entries(platforms)
+        .filter(([name]) => !only || name === only)
+        .map(([name, [cmd, ...args]]) => [name, [local(cmd), ...args]]);
+      if (!kept.length) throw new Error(`no platform "${only}" for app "${app}" in ${file}`);
+      return [app, Object.fromEntries(kept)];
+    }),
   );
-  if (!Object.keys(platforms).length) throw new Error(`no platform "${only}" in ${file}`);
-  return (config = { platforms, guard: raw.guard && local(raw.guard) });
+  return (config = { apps, guard: raw.guard && local(raw.guard) });
 }
 
-/** Registers one bun:test per configured platform, then a parity test comparing their transcripts. */
-export function journey(name: string, fn: (app: Session) => Promise<void>, timeoutMs = 30_000) {
-  const { platforms, guard } = loadConfig();
+export type JourneyOptions = { app?: string; fixture?: string; timeoutMs?: number };
+
+/**
+ * Registers one bun:test per platform of `app` (default: the first app in the config), then a parity test
+ * comparing their transcripts. `fixture` is appended to the host command as its first argument.
+ */
+export function journey(name: string, fn: (app: Session) => Promise<void>, opts: JourneyOptions = {}) {
+  const { apps, guard } = loadConfig();
+  const appName = opts.app ?? Object.keys(apps)[0];
+  const platforms = apps[appName];
+  if (!platforms) throw new Error(`no app "${appName}" in config`);
   const transcripts: Record<string, Step[]> = {};
   for (const [platform, command] of Object.entries(platforms)) {
     test(`${name} [${platform}]`, async () => {
-      const app = await session({ command, guard });
+      const app = await session({ command: opts.fixture ? [...command, opts.fixture] : command, guard });
       transcripts[platform] = app.transcript;
       try {
         await fn(app);
       } finally {
         await app.close();
       }
-    }, timeoutMs);
+    }, opts.timeoutMs ?? 30_000);
   }
   if (Object.keys(platforms).length < 2) return;
   test(`${name} [parity]`, () => {

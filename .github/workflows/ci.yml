@@ -60,5 +60,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: swift build -c release --package-path swift
       - run: kotlin/gradlew -p kotlin installDist
+      - run: swift build -c release --package-path samples/inventory/swift
+      - run: swift test --package-path samples/inventory/swift
+      - run: samples/inventory/kotlin/gradlew -p samples/inventory/kotlin build installDist
       - run: bun run build:guard
       - run: bun test --timeout 20000
