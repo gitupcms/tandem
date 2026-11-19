@@ -46,7 +46,7 @@ Her faz bir PR'dır. Faz, doğrulama komutu yeşil olmadan bitmiş sayılmaz.
 | F6 | Örnek uygulama: inventory (liste → detay → artır/azalt, tab + push navigator, GraphQL fixture). Swift Core + Kotlin Core + paylaşılan journey'ler. | OpenCode (Kotlin), opus-yazici (Swift) | **Bitti**: 8 inventory journey × (swift, kotlin, parity) guard açıkken yeşil; Swift core için 5 birim testi. |
 | F7 | Codegen: Swift `@Introspectable` / `@IntrospectionInput` macro, Kotlin KSP processor, elle yazılan node'ların yerine | opus-yazici | **Bitti**: state JSON ve action şeması/input çözme üretiliyor (Swift `TandemIntrospection` + swift-syntax, Kotlin `tandem-ksp` KSP 2.3.14). Elle kalan yalnız ağaç bağlantısı (Nodes.swift 113→33, Nodes.kt 97→50). Tüm testler değişmeden yeşil. |
 | F8 | Debug socket host (uygulama içi canlı kullanım), release build'den çıkarıldığının kontrolü. SwiftUI ve Compose örnek host'ları. | opus-yazici | **Bitti**: socket host iki kitte (Swift `#if DEBUG`, Kotlin ayrı `tandem-socket` modülü + ServiceLoader). Conformance socket üzerinden de 87/87, socket journey'i iki platformda. `check-release.sh` release çıktısında socket olmadığını doğruluyor. SwiftUI/Compose örnek host'ları ertelendi (Linux'ta SwiftUI yok, Compose ağır bağımlılık). |
-| F9 | Skill'ler: `start`, `cover`, `check`, `explore` bizim repoya göre yeniden yazılır (kardeş klon yerine paket kurulumu, Linux uyumlu). İsteğe bağlı olarak `reflex_state.py` tarzı ilerleme defteri. `duo-pattern` ve `post-deploy-watch` alınmaz. | Ben | Boş bir test reposunda `/start` → ilk journey yeşil |
+| F9 | Skill'ler: `start`, `cover`, `check`, `explore` bizim repoya göre yeniden yazılır (kardeş klon yerine paket kurulumu, Linux uyumlu). İsteğe bağlı olarak `reflex_state.py` tarzı ilerleme defteri. `duo-pattern` ve `post-deploy-watch` alınmaz. | Ben | **Bitti**: `skills/` altında 4 skill (sıfırdan) ve `tandem run` CLI (ls/do adımları, `--parity`, `--socket`). Boş bir Bun projesinde `tandem-kit` kurulup ilk journey 3/3 yeşil, CLI çalışıyor. Config artık çalışılan klasörden okunuyor. Swift/Kotlin tarafı boş repoda denenmedi (bkz. F10 notu). |
 | F10 | Dokümanlar (README'de yalnız doğrulanmış iddialar), 0.1.0 sürümü, SPM + Maven Central + npm yayını | Ben + sonnet-okuyucu (doküman/kod tutarlılık denetimi) | Taze klonda README komutları çalışır |
 
 Sıra: F0 → F1 → (F2 ∥ F3) → F4 → F5 → F6 → F7 → F8 → F9 → F10.
@@ -62,3 +62,13 @@ Flutter ve React Native host'ları, `reflex_init.py` tarzı otomatik uygulama ta
 - Android'de KSP ile Kotlin extension kısıtı yüzünden makaledeki ayrı `…IntrospectionNode` sınıfı gerekebilir.
 - iOS tarafı yalnız macOS CI ile doğrulanabilir, yerelde yapılamaz.
 - Swift ve Kotlin'in kanonik JSON çıktısını baytça eşitlemek: anahtar sıralama ve string kaçışları için iki dilde de kendi encoder'ımızı yazmak gerekebilir.
+
+## Mac gelince denenecek
+
+- Swift socket host'unun macOS'a özgü kısımları (`sin_len` gibi Darwin dalları) yerelde derlenmedi. Yalnız CI'daki macOS işi derliyor.
+- Network guard macOS'ta (`DYLD_INSERT_LIBRARIES`) hiç denenmedi.
+- Spec bazı socket uç durumlarını tanımlamıyor: port doluysa ne olacağı, bağlantı açıkken stdin kapanırsa ne olacağı. Bugün iki host da bind hatasında exit 1 veriyor, stdin kapanınca açık bağlantıyı kesip çıkıyor. Bunları test eden bir şey yok. Karar verip spec'e ve conformance'a eklenecek.
+
+## F10'da çözülecek
+
+- Swift kit git adresiyle eklenemiyor: SPM `Package.swift`'i reponun kökünde istiyor, bizimki `swift/` altında. Seçenekler: `Package.swift`'i köke taşımak ya da ayrı bir Swift reposu açmak. O zamana kadar `tandem-start` skill'i yerel yolla eklemeyi anlatıyor.

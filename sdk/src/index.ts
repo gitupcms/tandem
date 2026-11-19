@@ -66,7 +66,13 @@ export class Session {
       if (this.ended) throw new Error(this.socket ? "host closed the socket without answering" : `host exited (code ${await this.proc.exited}) without answering`);
       const left = deadline - Date.now();
       if (left <= 0) throw new Error(`host did not answer within ${RESPONSE_MS}ms`);
-      await new Promise<void>(r => { this.waiter = r; setTimeout(r, left); });
+      await new Promise<void>(r => {
+        const timer = setTimeout(r, left);
+        this.waiter = () => {
+          clearTimeout(timer);
+          r();
+        };
+      });
       this.waiter = undefined;
     }
     return this.lines.shift()!;
@@ -206,12 +212,12 @@ export function parityDiff(transcripts: Record<string, Step[]>): string | undefi
   }
 }
 
-type Config = { apps: Record<string, Record<string, string[]>>; guard?: string };
+export type Config = { apps: Record<string, Record<string, string[]>>; guard?: string };
 let config: Config | undefined;
 
-function loadConfig(): Config {
+export function loadConfig(): Config {
   if (config) return config;
-  const file = process.env.TANDEM_CONFIG ?? resolve(import.meta.dir, "../../tandem.config.json");
+  const file = process.env.TANDEM_CONFIG ?? resolve("tandem.config.json"); // the project being tested, not this package
   const dir = dirname(file);
   const raw: Config = JSON.parse(readFileSync(file, "utf8"));
   const local = (p: string) => (p.includes("/") && !isAbsolute(p) ? join(dir, p) : p);

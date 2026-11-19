@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "exports": "./sdk/src/index.ts",
+  "bin": {
+    "tandem": "./sdk/src/cli.ts"
+  },
   "license": "MIT",
   "scripts": {
     "test": "bun test",
