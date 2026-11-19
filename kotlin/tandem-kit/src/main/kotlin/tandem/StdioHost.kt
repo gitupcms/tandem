@@ -5,10 +5,10 @@ import java.io.InputStream
 import java.io.OutputStream
 
 /**
- * Headless transport: splits [input] into lines per spec "Framing", answers each through [session],
- * and returns at end of input.
+ * The line reader every transport shares: splits [input] into lines per spec "Framing", answers each
+ * through [session], and returns at end of input (stdin EOF or a socket half-close).
  */
-fun runStdio(session: Session, input: InputStream = System.`in`, output: OutputStream = System.out) {
+fun serveLines(session: Session, input: InputStream = System.`in`, output: OutputStream = System.out) {
     val src = input.buffered()
     val out = output.buffered()
     val line = ByteArrayOutputStream()

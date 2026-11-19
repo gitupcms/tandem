@@ -4,25 +4,12 @@ import Foundation
 public enum StdioHost {
     public static func run(_ session: Session) {
         let out = FileHandle.standardOutput
-        var line: [UInt8] = []
-
-        func answer() {
-            // A CR is part of the line ending only when it sits right before the LF.
-            if line.last == 0x0D { line.removeLast() }
-            out.write(Data((session.respond(line) + "\n").utf8))
-            line = []
-        }
+        var reader = LineReader()
+        let answer = { (line: [UInt8]) in out.write(Data((session.respond(line) + "\n").utf8)) }
 
         while case let chunk = FileHandle.standardInput.availableData, !chunk.isEmpty {
-            for byte in chunk {
-                if byte == 0x0A {
-                    answer()
-                } else {
-                    // Stop buffering past limit + CR + 1: the line is already too long, even after a CR is dropped.
-                    if line.count < Session.maxLine + 2 { line.append(byte) }
-                }
-            }
+            reader.feed(chunk, answer)
         }
-        if !line.isEmpty { answer() }
+        reader.finish(answer)
     }
 }

@@ -11,4 +11,5 @@ guard !name.isEmpty, FileManager.default.fileExists(atPath: dir.path, isDirector
     FileHandle.standardError.write(Data("unknown fixture: \(name.isEmpty ? "(none)" : name) (looked in \(root))\n".utf8))
     exit(64)
 }
-StdioHost.run(Session(root: appNode(AppModel(service: FixtureService(dir: dir))), platform: "swift"))
+let app = appNode(AppModel(service: FixtureService(dir: dir)))
+Host.run(CommandLine.arguments.dropFirst(2)) { Session(root: app, platform: "swift") }

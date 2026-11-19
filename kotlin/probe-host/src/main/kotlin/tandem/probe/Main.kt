@@ -1,7 +1,7 @@
 package tandem.probe
 
 import tandem.Session
-import tandem.runStdio
+import tandem.runHost
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
@@ -11,5 +11,5 @@ fun main(args: Array<String>) {
         exitProcess(64)
     }
     val app = AppModel()
-    runStdio(Session("kotlin") { app.node() })
+    runHost(args.drop(1)) { Session("kotlin") { app.node() } }
 }

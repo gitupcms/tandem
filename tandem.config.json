@@ -1,12 +1,28 @@
 {
   "apps": {
     "probe": {
-      "swift": ["swift/.build/release/TandemProbe"],
-      "kotlin": ["kotlin/probe-host/build/install/probe-host/bin/probe-host"]
+      "swift": [
+        "swift/.build/release/TandemProbe"
+      ],
+      "kotlin": [
+        "kotlin/probe-host/build/install/probe-host/bin/probe-host"
+      ]
     },
     "inventory": {
-      "swift": ["samples/inventory/swift/.build/release/InventoryCLI"],
-      "kotlin": ["samples/inventory/kotlin/cli/build/install/cli/bin/cli"]
+      "swift": [
+        "samples/inventory/swift/.build/release/InventoryCLI"
+      ],
+      "kotlin": [
+        "samples/inventory/kotlin/cli/build/install/cli/bin/cli"
+      ]
+    },
+    "inventory-debug": {
+      "swift": [
+        "samples/inventory/swift/.build/debug/InventoryCLI"
+      ],
+      "kotlin": [
+        "samples/inventory/kotlin/cli/build/install/cli-debug/bin/cli"
+      ]
     }
   },
   "guard": "guard/build/libtandemguard.so"

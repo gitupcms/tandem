@@ -7,4 +7,4 @@ pluginManagement {
 
 rootProject.name = "tandem-kotlin"
 
-include("tandem-kit", "tandem-annotations", "tandem-ksp", "tandem-ksp-tests", "probe-host")
+include("tandem-kit", "tandem-annotations", "tandem-ksp", "tandem-ksp-tests", "tandem-socket", "probe-host")

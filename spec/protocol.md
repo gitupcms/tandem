@@ -6,6 +6,10 @@ A Tandem host exposes an app's screens to a client (a test, the CLI, an agent). 
 
 - Headless: the host is a process. Requests arrive on stdin, responses leave on stdout, logs go to stderr.
 - In-app (debug builds only): the same lines over a loopback TCP socket. Release builds must not contain the socket server.
+  - A headless host started with `--socket <port>` after the fixture name serves the socket instead of stdin. Port `0` picks a free port. When ready it writes one line `listening 127.0.0.1:<port>` to stderr.
+  - It binds only 127.0.0.1. Each connection is its own session and starts with `hello`. The app's state carries over from one connection to the next. One connection is served at a time; others wait. When the client shuts down its sending side, that is end of input for the session (a final line that does not end in LF is still answered, like on stdin), and the host then closes the connection.
+  - The host exits with code 0 when its stdin reaches end of input.
+  - A release host given `--socket` exits with code 64 and a message on stderr.
 - The host's first command-line argument names a fixture set. An unknown name exits with code 64 and a message on stderr.
 
 ## Framing

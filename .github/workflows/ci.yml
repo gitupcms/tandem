@@ -28,6 +28,13 @@ jobs:
         env:
           TANDEM_HOST: swift/.build/release/TandemProbe probe
           TANDEM_PLATFORM: swift
+      - run: swift build --package-path swift
+      - run: bun test ./test
+        env:
+          TANDEM_HOST: swift/.build/debug/TandemProbe probe
+          TANDEM_PLATFORM: swift
+          TANDEM_SOCKET: "1"
+      - run: swift/check-release.sh
 
   kotlin:
     runs-on: ubuntu-24.04
@@ -39,11 +46,17 @@ jobs:
           java-version: "17"
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - run: kotlin/gradlew -p kotlin build installDist
+      - run: kotlin/gradlew -p kotlin build installDist installDebugDist
       - run: bun test ./test --timeout 20000
         env:
           TANDEM_HOST: kotlin/probe-host/build/install/probe-host/bin/probe-host probe
           TANDEM_PLATFORM: kotlin
+      - run: bun test ./test --timeout 20000
+        env:
+          TANDEM_HOST: kotlin/probe-host/build/install/probe-host-debug/bin/probe-host probe
+          TANDEM_PLATFORM: kotlin
+          TANDEM_SOCKET: "1"
+      - run: kotlin/check-release.sh
 
   journeys:
     runs-on: ubuntu-24.04
@@ -61,7 +74,8 @@ jobs:
       - run: swift build -c release --package-path swift
       - run: kotlin/gradlew -p kotlin installDist
       - run: swift build -c release --package-path samples/inventory/swift
+      - run: swift build --package-path samples/inventory/swift
       - run: swift test --package-path samples/inventory/swift
-      - run: samples/inventory/kotlin/gradlew -p samples/inventory/kotlin build installDist
+      - run: samples/inventory/kotlin/gradlew -p samples/inventory/kotlin build installDist installDebugDist
       - run: bun run build:guard
       - run: bun test --timeout 20000

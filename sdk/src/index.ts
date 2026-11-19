@@ -1,6 +1,8 @@
 // Tandem test SDK: drive a Tandem host (spec/protocol.md) from bun:test, on every platform, with a parity check.
 import { test } from "bun:test";
+import { once } from "node:events";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { connect, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
@@ -25,28 +27,43 @@ export class Session {
   private waiter: (() => void) | undefined;
   private ended = false;
 
-  constructor(private proc: Bun.Subprocess<"pipe", "pipe", "inherit">, private timeoutMs: number, private guardLog?: string) {
-    this.pump();
+  private dec = new TextDecoder();
+  private buf = "";
+  private socket: Socket | undefined;
+
+  constructor(private proc: Bun.Subprocess<"pipe", any, any>, private timeoutMs: number, private guardLog?: string) {}
+
+  /** Reads replies from the host's stdout. */
+  async readStdout() {
+    for await (const chunk of this.proc.stdout as ReadableStream<Uint8Array>) this.feed(chunk);
+    this.end();
   }
 
-  private async pump() {
-    const dec = new TextDecoder();
-    let buf = "";
-    for await (const chunk of this.proc.stdout) {
-      buf += dec.decode(chunk, { stream: true });
-      const parts = buf.split("\n");
-      buf = parts.pop()!;
-      this.lines.push(...parts);
-      this.waiter?.();
-    }
+  private feed(chunk: Uint8Array) {
+    this.buf += this.dec.decode(chunk, { stream: true });
+    const parts = this.buf.split("\n");
+    this.buf = parts.pop()!;
+    this.lines.push(...parts);
+    this.waiter?.();
+  }
+
+  private end() {
     this.ended = true;
     this.waiter?.();
+  }
+
+  /** Talks over the host's debug socket instead of stdio. */
+  async connect(port: number) {
+    const socket = connect(port, "127.0.0.1");
+    socket.on("data", d => this.feed(d)).on("close", () => this.end()).on("error", () => this.end());
+    await once(socket, "connect");
+    this.socket = socket;
   }
 
   private async nextLine(): Promise<string> {
     const deadline = Date.now() + RESPONSE_MS;
     while (!this.lines.length) {
-      if (this.ended) throw new Error(`host exited (code ${await this.proc.exited}) without answering`);
+      if (this.ended) throw new Error(this.socket ? "host closed the socket without answering" : `host exited (code ${await this.proc.exited}) without answering`);
       const left = deadline - Date.now();
       if (left <= 0) throw new Error(`host did not answer within ${RESPONSE_MS}ms`);
       await new Promise<void>(r => { this.waiter = r; setTimeout(r, left); });
@@ -58,8 +75,11 @@ export class Session {
   /** Sends one request, records the reply, returns it parsed. Throws ProtocolError on ok:false. */
   async send(request: object): Promise<any> {
     const line = JSON.stringify(request);
-    this.proc.stdin.write(line + "\n");
-    this.proc.stdin.flush();
+    if (this.socket) this.socket.write(line + "\n");
+    else {
+      this.proc.stdin.write(line + "\n");
+      this.proc.stdin.flush();
+    }
     const response = await this.nextLine();
     this.transcript.push({ request: line, response });
     this.checkGuard();
@@ -93,6 +113,7 @@ export class Session {
   }
 
   async close() {
+    this.socket?.end();
     this.proc.stdin.end();
     const code = await this.proc.exited;
     this.checkGuard();
@@ -120,7 +141,29 @@ export class Session {
 const describe = (want: Want) => (typeof want === "string" ? `screen "${want}"` : "predicate");
 const guardLines = (log: string) => (existsSync(log) ? readFileSync(log, "utf8").split("\n") : []);
 
-export async function session(opts: { command: string[]; guard?: string; timeoutMs?: number }): Promise<Session> {
+/** Waits for the `listening 127.0.0.1:<port>` line a host started with `--socket 0` writes to stderr; forwards the rest. */
+export async function listeningPort(proc: Bun.Subprocess<any, any, "pipe">): Promise<number> {
+  const reader = proc.stderr.getReader();
+  const dec = new TextDecoder();
+  let text = "";
+  const timer = setTimeout(() => proc.kill(), RESPONSE_MS);
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) throw new Error(`host exited before listening (code ${await proc.exited}): ${text.trim()}`);
+      text += dec.decode(value, { stream: true });
+      const m = text.match(/^listening 127\.0\.0\.1:(\d+)$/m);
+      if (m) {
+        (async () => { for (;;) { const r = await reader.read(); if (r.done) break; process.stderr.write(r.value); } })();
+        return Number(m[1]);
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function session(opts: { command: string[]; guard?: string; timeoutMs?: number; socket?: boolean }): Promise<Session> {
   const env: Record<string, string | undefined> = { ...process.env };
   let guardLog: string | undefined;
   if (opts.guard) {
@@ -130,9 +173,12 @@ export async function session(opts: { command: string[]; guard?: string; timeout
     env[process.platform === "darwin" ? "DYLD_INSERT_LIBRARIES" : "LD_PRELOAD"] = lib;
     env.TANDEM_GUARD_LOG = guardLog;
   }
-  const proc = Bun.spawn(opts.command, { stdin: "pipe", stdout: "pipe", stderr: "inherit", env });
+  const command = opts.socket ? [...opts.command, "--socket", "0"] : opts.command;
+  const proc = Bun.spawn(command, { stdin: "pipe", stdout: "pipe", stderr: opts.socket ? "pipe" : "inherit", env });
   const app = new Session(proc, opts.timeoutMs ?? 2000, guardLog);
   try {
+    if (opts.socket) await app.connect(await listeningPort(proc as Bun.Subprocess<"pipe", "pipe", "pipe">));
+    else app.readStdout();
     await app.send({ op: "hello", version: 1 });
     if (guardLog && !guardLines(guardLog).some(l => l.startsWith("loaded"))) throw new Error("guard did not load");
   } catch (e) {
@@ -182,11 +228,12 @@ function loadConfig(): Config {
   return (config = { apps, guard: raw.guard && local(raw.guard) });
 }
 
-export type JourneyOptions = { app?: string; fixture?: string; timeoutMs?: number };
+export type JourneyOptions = { app?: string; fixture?: string; timeoutMs?: number; socket?: boolean };
 
 /**
  * Registers one bun:test per platform of `app` (default: the first app in the config), then a parity test
- * comparing their transcripts. `fixture` is appended to the host command as its first argument.
+ * comparing their transcripts. `fixture` is appended to the host command as its first argument. `socket` drives
+ * the host over its debug socket (spec: Transport) instead of stdio; use a debug build.
  */
 export function journey(name: string, fn: (app: Session) => Promise<void>, opts: JourneyOptions = {}) {
   const { apps, guard } = loadConfig();
@@ -196,7 +243,7 @@ export function journey(name: string, fn: (app: Session) => Promise<void>, opts:
   const transcripts: Record<string, Step[]> = {};
   for (const [platform, command] of Object.entries(platforms)) {
     test(`${name} [${platform}]`, async () => {
-      const app = await session({ command: opts.fixture ? [...command, opts.fixture] : command, guard });
+      const app = await session({ command: opts.fixture ? [...command, opts.fixture] : command, guard, socket: opts.socket });
       transcripts[platform] = app.transcript;
       try {
         await fn(app);
